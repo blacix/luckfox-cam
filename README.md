@@ -130,18 +130,28 @@ Confirm the selected configuration:
 ./build.sh info
 ```
 
-Build the kernel:
+Build the kernel image and device tree:
 
 ```sh
 ./build.sh kernel
 ```
 
+Build and install the loadable kernel modules:
+
+```sh
+./build.sh driver
+```
+
+The `kernel` target does not install loadable modules. The `driver` target
+also rebuilds the kernel before running the module build and installation
+steps.
+
 After the build, locate the generated module and verify the kernel
 configuration:
 
 ```sh
-rg --files . | rg "imx415\.ko$"
-rg -n "CONFIG_VIDEO_IMX415" sysdrv/source/kernel/.config
+find . -type f -name "imx415.ko"
+grep -n "CONFIG_VIDEO_IMX415" sysdrv/source/objs_kernel/.config
 ```
 
 The expected configuration is:
@@ -149,6 +159,48 @@ The expected configuration is:
 ```text
 CONFIG_VIDEO_IMX415=m
 ```
+
+## Temporarily loading the module on the device
+
+From the host shell, copy the module to a temporary directory on the
+board, then open an interactive shell on the device:
+
+```sh
+cd /home/lacos/a-eye/luckfox-cam/sdk/luckfox-pico
+adb push sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko /tmp/imx415.ko
+adb shell
+```
+
+The following commands are issued from the device shell after running
+`adb shell`:
+
+```sh
+uname -r
+id
+ls -l /tmp/imx415.ko
+insmod /tmp/imx415.ko
+lsmod | grep imx415
+dmesg | tail -n 80
+```
+
+If the device shell is not running as root, exit the shell and restart ADB as
+root from the host shell before entering it again:
+
+```sh
+adb root
+adb shell
+```
+
+Then repeat the device-shell commands above.
+
+This temporary test does not modify the firmware image. It verifies module
+compatibility with the running kernel, but it will not probe the camera yet
+because the running device tree still describes the SC3336 sensor. A successful
+module load may therefore produce no IMX415 sensor messages.
+
+If loading fails, capture the complete error and recent kernel log. Common
+failures include an invalid module format, an ARM architecture mismatch,
+missing symbols, or insufficient permissions.
 
 Building the module alone does not configure the camera. The current firmware
 still contains an SC3336 device-tree node, so IMX415 support will also require
