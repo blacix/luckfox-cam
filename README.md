@@ -104,6 +104,58 @@ Work should proceed in this order:
 
 The stock SC3336 IQ file must not be treated as an IMX415 configuration.
 
+## Building the IMX415 kernel module
+
+The local LuckFox SDK already contains the IMX415 driver and enables it as a
+loadable kernel module with `CONFIG_VIDEO_IMX415=m`.
+
+Change to the SDK directory and select the LuckFox Pico Mini configuration:
+
+```sh
+cd sdk/luckfox-pico
+./build.sh lunch
+```
+
+Select these options from the menus:
+
+```text
+RV1103_Luckfox_Pico_Mini
+SPI_NAND
+Buildroot
+```
+
+Confirm the selected configuration:
+
+```sh
+./build.sh info
+```
+
+Build the kernel:
+
+```sh
+./build.sh kernel
+```
+
+After the build, locate the generated module and verify the kernel
+configuration:
+
+```sh
+rg --files . | rg "imx415\.ko$"
+rg -n "CONFIG_VIDEO_IMX415" sysdrv/source/kernel/.config
+```
+
+The expected configuration is:
+
+```text
+CONFIG_VIDEO_IMX415=m
+```
+
+Building the module alone does not configure the camera. The current firmware
+still contains an SC3336 device-tree node, so IMX415 support will also require
+an IMX415 device-tree node and packaging the resulting module and device tree
+into the firmware image. Do not flash the board until the module, device tree,
+and recovery image have been checked together.
+
 ## Status
 
 The supplied board image currently contains SC3336 support and does not
