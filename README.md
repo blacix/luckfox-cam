@@ -76,8 +76,8 @@ upgrade_tool uf update.img
 For example:
 
 ```sh
-cd sdk/upgrade_tool_v2_17
-./upgrade_tool uf ../Luckfox_Pico_Mini_Flash_250607/update.img
+./sdk/upgrade_tool_v2_17/upgrade_tool uf \
+  ./sdk/Luckfox_Pico_Mini_Flash_250607/update.img
 ```
 
 The board should be recoverable to this stock image before experimental
@@ -109,11 +109,16 @@ The stock SC3336 IQ file must not be treated as an IMX415 configuration.
 The local LuckFox SDK already contains the IMX415 driver and enables it as a
 loadable kernel module with `CONFIG_VIDEO_IMX415=m`.
 
-Change to the SDK directory and select the LuckFox Pico Mini configuration:
+The tracked root-level DTSI is the source of truth for local camera changes:
+
+```text
+rv1103-luckfox-pico-ipc.dtsi
+```
+
+Select the LuckFox Pico Mini configuration once using the SDK menu:
 
 ```sh
-cd sdk/luckfox-pico
-./build.sh lunch
+./sdk/luckfox-pico/build.sh lunch
 ```
 
 Select these options from the menus:
@@ -124,34 +129,22 @@ SPI_NAND
 Buildroot
 ```
 
-Confirm the selected configuration:
+After selecting the board, return to the repository root. Build the complete
+SDK image set and package a flashable `update.img`:
 
 ```sh
-./build.sh info
+./build-camera.sh
 ```
 
-Build the kernel image and device tree:
-
-```sh
-./build.sh kernel
-```
-
-Build and install the loadable kernel modules:
-
-```sh
-./build.sh driver
-```
-
-The `kernel` target does not install loadable modules. The `driver` target
-also rebuilds the kernel before running the module build and installation
-steps.
+The script copies `rv1103-luckfox-pico-ipc.dtsi` into the SDK, runs
+`sdk/luckfox-pico/build.sh all`, and runs `updateimg`.
 
 After the build, locate the generated module and verify the kernel
 configuration:
 
 ```sh
-ls -l sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko
-grep -n "CONFIG_VIDEO_IMX415" sysdrv/source/objs_kernel/.config
+ls -l sdk/luckfox-pico/sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko
+grep -n "CONFIG_VIDEO_IMX415" sdk/luckfox-pico/sysdrv/source/objs_kernel/.config
 ```
 
 The expected configuration is:
@@ -166,8 +159,7 @@ From the host shell, copy the module to a temporary directory on the
 board, then open an interactive shell on the device:
 
 ```sh
-cd /home/lacos/a-eye/luckfox-cam/sdk/luckfox-pico
-adb push sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko /tmp/imx415.ko
+adb push sdk/luckfox-pico/sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko /tmp/imx415.ko
 adb shell
 ```
 
@@ -204,24 +196,20 @@ missing symbols, or insufficient permissions.
 
 ## Starting device-tree integration
 
-Before changing the camera configuration, create backups of the original
-Mini board device tree and its camera include file:
+The tracked root-level DTSI is the file to edit. Create a backup before
+changing it:
 
 ```sh
-cd /home/lacos/a-eye/luckfox-cam/sdk/luckfox-pico
-cp sysdrv/source/kernel/arch/arm/boot/dts/rv1103g-luckfox-pico-mini.dts \
-   sysdrv/source/kernel/arch/arm/boot/dts/rv1103g-luckfox-pico-mini.dts.orig
-cp sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi \
-   sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi.orig
+cp rv1103-luckfox-pico-ipc.dtsi rv1103-luckfox-pico-ipc.dtsi.orig
 ```
 
-The top-level board DTS includes `rv1103-luckfox-pico-ipc.dtsi`. The SC3336
-sensor nodes and CSI endpoint connections are defined in that included file.
-Inspect them there:
+The build script copies this file to the SDK path selected by the board DTS.
+The SC3336 sensor nodes and CSI endpoint connections are defined in it.
+Inspect them from the repository root:
 
 ```sh
 grep -n -E "sc3336|sc4336|sc530ai|mipi|csi2|endpoint|ff470000" \
-  sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi
+  rv1103-luckfox-pico-ipc.dtsi
 ```
 
 Replace the SC3336 sensor node with an IMX415 sensor node in the included
@@ -232,11 +220,10 @@ change. The IMX415 node must use the confirmed sensor I²C address, clock,
 regulators, GPIOs, and two-lane CSI-2 configuration; do not guess unverified
 hardware properties.
 
-After editing the device tree, rebuild the kernel image and modules:
+After editing the device tree, rebuild and package from the repository root:
 
 ```sh
-./build.sh kernel
-./build.sh driver
+./build-camera.sh
 ```
 
 The updated device tree must eventually be packaged into the boot image. The
@@ -248,6 +235,36 @@ still contains an SC3336 device-tree node, so IMX415 support will also require
 an IMX415 device-tree node and packaging the resulting module and device tree
 into the firmware image. Do not flash the board until the module, device tree,
 and recovery image have been checked together.
+
+## Current device-tree integration
+
+The tracked root DTSI currently contains the staged camera migration:
+
+- SC3336, SC4336, and SC530AI nodes are disabled.
+- The CSI-2 input endpoint points to `imx415_out`.
+- The IMX415 node is enabled at I²C address `0x30`.
+- The existing MIPI clock and camera power-down pin are reused.
+- Reset GPIO and regulator assignments remain TODOs until the module wiring is
+  confirmed.
+
+The root-level build script is the required build entry point:
+
+```sh
+./build-camera.sh
+```
+
+After a successful build, the complete firmware image is available at:
+
+```text
+sdk/luckfox-pico/output/image/update.img
+```
+
+Flash it from the repository root with the local upgrade tool:
+
+```sh
+./sdk/upgrade_tool_v2_17/upgrade_tool uf \
+  ./sdk/luckfox-pico/output/image/update.img
+```
 
 ## Status
 
