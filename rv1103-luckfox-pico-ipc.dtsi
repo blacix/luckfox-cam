@@ -236,13 +236,14 @@
 
 	imx415: imx415@30 {
 		compatible = "sony,imx415";
-		status = "disabled";
+		status = "okay";
 		reg = <0x30>;
 		clocks = <&cru MCLK_REF_MIPI0>;
 		clock-names = "xvclk";
-		/* Add confirmed reset-gpios and power-gpios when available. */
-		/* Add confirmed avdd-supply, dovdd-supply, and dvdd-supply. */
-		pinctrl-names = "default";
+		power-gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_LOW>;
+		/* TODO: Add the confirmed reset-gpios property. */
+		/* TODO: Add confirmed avdd-supply, dovdd-supply, and dvdd-supply. */
+		pinctrl-names = "rockchip,camera_default";
 		pinctrl-0 = <&mipi_refclk_out0>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
