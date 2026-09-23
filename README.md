@@ -66,14 +66,8 @@ The stock firmware image is located at:
 sdk/Luckfox_Pico_Mini_Flash_250607/update.img
 ```
 
-`upgrade_tool` is included locally and is not installed on `PATH`. Run the
-command from the directory containing the tool and `update.img`:
-
-```sh
-upgrade_tool uf update.img
-```
-
-For example:
+`upgrade_tool` is included locally and is not installed on `PATH`. From the
+repository root, run:
 
 ```sh
 ./sdk/upgrade_tool_v2_17/upgrade_tool uf \
@@ -196,11 +190,12 @@ missing symbols, or insufficient permissions.
 
 ## Starting device-tree integration
 
-The tracked root-level DTSI is the file to edit. Create a backup before
-changing it:
+The tracked root-level DTSI is the file to edit. Before copying it over the
+SDK version, create a backup of the stock SDK DTSI:
 
 ```sh
-cp rv1103-luckfox-pico-ipc.dtsi rv1103-luckfox-pico-ipc.dtsi.orig
+cp sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi \
+  sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi.orig
 ```
 
 The build script copies this file to the SDK path selected by the board DTS.
@@ -230,11 +225,10 @@ The updated device tree must eventually be packaged into the boot image. The
 kernel module and device-tree changes are both required for the IMX415 driver
 to bind to the sensor.
 
-Building the module alone does not configure the camera. The current firmware
-still contains an SC3336 device-tree node, so IMX415 support will also require
-an IMX415 device-tree node and packaging the resulting module and device tree
-into the firmware image. Do not flash the board until the module, device tree,
-and recovery image have been checked together.
+Building the module alone does not configure the camera. IMX415 support also
+requires the IMX415 device-tree node and packaging the resulting module and
+device tree into the firmware image. Do not flash the board until the module,
+device tree, and recovery image have been checked together.
 
 ## Current device-tree integration
 
