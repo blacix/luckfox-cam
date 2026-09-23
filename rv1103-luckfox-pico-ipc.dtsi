@@ -135,7 +135,7 @@
 
 			csi_dphy_input0: endpoint@0 {
 				reg = <0>;
-				remote-endpoint = <&sc3336_out>;
+				remote-endpoint = <&imx415_out>;
 				data-lanes = <1 2>;
 			};
 
