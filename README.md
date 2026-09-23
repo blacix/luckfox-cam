@@ -150,7 +150,7 @@ After the build, locate the generated module and verify the kernel
 configuration:
 
 ```sh
-find . -type f -name "imx415.ko"
+ls -l sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko
 grep -n "CONFIG_VIDEO_IMX415" sysdrv/source/objs_kernel/.config
 ```
 
@@ -201,6 +201,47 @@ module load may therefore produce no IMX415 sensor messages.
 If loading fails, capture the complete error and recent kernel log. Common
 failures include an invalid module format, an ARM architecture mismatch,
 missing symbols, or insufficient permissions.
+
+## Starting device-tree integration
+
+Before changing the camera configuration, create backups of the original
+Mini board device tree and its camera include file:
+
+```sh
+cd /home/lacos/a-eye/luckfox-cam/sdk/luckfox-pico
+cp sysdrv/source/kernel/arch/arm/boot/dts/rv1103g-luckfox-pico-mini.dts \
+   sysdrv/source/kernel/arch/arm/boot/dts/rv1103g-luckfox-pico-mini.dts.orig
+cp sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi \
+   sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi.orig
+```
+
+The top-level board DTS includes `rv1103-luckfox-pico-ipc.dtsi`. The SC3336
+sensor nodes and CSI endpoint connections are defined in that included file.
+Inspect them there:
+
+```sh
+grep -n -E "sc3336|sc4336|sc530ai|mipi|csi2|endpoint|ff470000" \
+  sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi
+```
+
+Replace the SC3336 sensor node with an IMX415 sensor node in the included
+DTSI file. Also update the corresponding CSI endpoint reference from
+`sc3336_out` to the new IMX415 endpoint name. Preserve the
+existing CSI-2, RKCIF, and endpoint graph unless the board wiring requires a
+change. The IMX415 node must use the confirmed sensor I²C address, clock,
+regulators, GPIOs, and two-lane CSI-2 configuration; do not guess unverified
+hardware properties.
+
+After editing the device tree, rebuild the kernel image and modules:
+
+```sh
+./build.sh kernel
+./build.sh driver
+```
+
+The updated device tree must eventually be packaged into the boot image. The
+kernel module and device-tree changes are both required for the IMX415 driver
+to bind to the sensor.
 
 Building the module alone does not configure the camera. The current firmware
 still contains an SC3336 device-tree node, so IMX415 support will also require
