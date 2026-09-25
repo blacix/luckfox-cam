@@ -3,6 +3,7 @@
  * Copyright (c) 2022 Rockchip Electronics Co., Ltd.
  */
 #include "rv1106-amp.dtsi"
+#include <dt-bindings/pwm/pwm.h>
 
 / {
 	chosen {
@@ -54,6 +55,19 @@
 			gpios = <&gpio3 RK_PC6 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "activity";
 			default-state = "on";
+		};
+	};
+
+	/* PWM0 drives the second LED on GPIO1_PA2. */
+	pwm_leds: pwm-leds {
+		compatible = "pwm-leds";
+
+		pwm0_led: pwm0-led {
+			label = "pwm0_led";
+			/* The SDK PWM header lacks PWM_POLARITY_NORMAL; normal is 0. */
+			pwms = <&pwm0 0 1000000 0>;
+			max-brightness = <255>;
+			default-state = "off";
 		};
 	};
 

@@ -147,6 +147,51 @@ The expected configuration is:
 CONFIG_VIDEO_IMX415=m
 ```
 
+## Testing PWM0 on the second LED
+
+PWM0 uses GPIO1_PA2, which is connected to the second board LED. The ST7789
+display node is commented out in the tracked DTSI because it previously used
+the same pin as its D/C GPIO.
+
+The device tree enables PWM0, assigns GPIO1_PA2 to it, and declares the LED as
+a `pwm-leds` consumer. The consumer owns PWM0 and sets the board's required
+`normal` polarity in the device tree. Use the LED class interface rather than
+exporting the PWM channel manually.
+
+After booting firmware built from the tracked DTSI, open a root shell on the
+device:
+
+```sh
+adb shell
+```
+
+Run these commands from the device shell:
+
+```sh
+cat /proc/device-tree/pwm@ff350000/status
+ls -l /sys/class/leds
+cat /sys/class/leds/pwm0_led/max_brightness
+echo 128 > /sys/class/leds/pwm0_led/brightness
+```
+
+The LED should turn on at approximately 50% brightness. Change the brightness
+through the LED class interface:
+
+```sh
+echo 25 > /sys/class/leds/pwm0_led/brightness
+echo 230 > /sys/class/leds/pwm0_led/brightness
+```
+
+Turn the LED off when finished:
+
+```sh
+echo 0 > /sys/class/leds/pwm0_led/brightness
+```
+
+The device-tree status should report `okay`, and `/sys/class/leds` should
+contain `pwm0_led`. Because the LED consumer owns PWM0, do not export `pwm0`
+manually through `/sys/class/pwm`.
+
 ## Temporarily loading the module on the device
 
 From the host shell, copy the module to a temporary directory on the
