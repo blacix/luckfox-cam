@@ -344,6 +344,11 @@
 		spi-max-frequency = <50000000>;
 		reg = <0>;
 	};
+	/*
+	 * ST7789 display disabled while GPIO1_PA2 is used by PWM0.
+	 * The display D/C signal was connected to GPIO1_PA2.
+	 */
+	/*
 	fbtft@0 {
 		compatible = "sitronix,st7789v";
 		reg = <0>;
@@ -355,6 +360,7 @@
 		dc-gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_HIGH>;//DC
 		reset-gpios = <&gpio1 RK_PC3 GPIO_ACTIVE_LOW>;//RES
 	};
+	*/
 };
 // I2C
 &i2c3 {
@@ -375,6 +381,7 @@
 };
 
 // PWM
+// PWM0 M0 uses GPIO1_PA2, which is connected to the second board LED.
 &pwm0 {
 	status = "okay";
 	pinctrl-names = "active";
