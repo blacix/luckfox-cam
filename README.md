@@ -109,6 +109,12 @@ The tracked root-level DTSI is the source of truth for local camera changes:
 rv1103-luckfox-pico-ipc.dtsi
 ```
 
+The tracked kernel configuration is:
+
+```text
+luckfox_rv1106_linux_defconfig
+```
+
 Select the LuckFox Pico Mini configuration once using the SDK menu:
 
 ```sh
@@ -130,8 +136,26 @@ SDK image set and package a flashable `update.img`:
 ./build-camera.sh
 ```
 
-The script copies `rv1103-luckfox-pico-ipc.dtsi` into the SDK, runs
-`sdk/luckfox-pico/build.sh all`, and runs `updateimg`.
+Before building, the script copies the tracked files into these SDK
+destinations:
+
+```text
+rv1103-luckfox-pico-ipc.dtsi
+  -> sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi
+luckfox_rv1106_linux_defconfig
+  -> sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/configs/luckfox_rv1106_linux_defconfig
+```
+
+The copied DTSI contains the board-specific hardware description: the IMX415
+I²C node and CSI-2 endpoint graph, the disabled legacy camera nodes, the PWM0
+pin assignment, the `pwm-leds` consumer for GPIO1_PA2, and the commented-out
+ST7789 node that previously used the same pin. The copied defconfig controls
+which kernel features are built; in particular, it enables the IMX415 driver
+as a module with `CONFIG_VIDEO_IMX415=m` and builds the PWM LED consumer with
+`CONFIG_LEDS_PWM=y`.
+
+It then runs `sdk/luckfox-pico/build.sh all` and packages the result with
+`updateimg`.
 
 After the build, locate the generated module and verify the kernel
 configuration:
@@ -145,7 +169,22 @@ The expected configuration is:
 
 ```text
 CONFIG_VIDEO_IMX415=m
+CONFIG_LEDS_PWM=y
 ```
+
+## Deploying the driver and LED test script
+
+After building the kernel module, deploy it and the device-only LED test
+script from the repository root:
+
+```sh
+./deploy.sh
+```
+
+The script pushes `imx415.ko` to `/tmp/imx415.ko`, installs
+`test-pwm-led.sh` as `/usr/bin/test-pwm-led.sh`, and loads the IMX415 module
+with `insmod` if it is not already loaded. It requires a connected device
+with a root ADB shell.
 
 ## Testing PWM0 on the second LED
 
@@ -165,32 +204,23 @@ device:
 adb shell
 ```
 
-Run these commands from the device shell:
+Verify the PWM device-tree node and LED class device:
 
 ```sh
 cat /proc/device-tree/pwm@ff350000/status
 ls -l /sys/class/leds
-cat /sys/class/leds/pwm0_led/max_brightness
-echo 128 > /sys/class/leds/pwm0_led/brightness
-```
-
-The LED should turn on at approximately 50% brightness. Change the brightness
-through the LED class interface:
-
-```sh
-echo 25 > /sys/class/leds/pwm0_led/brightness
-echo 230 > /sys/class/leds/pwm0_led/brightness
-```
-
-Turn the LED off when finished:
-
-```sh
-echo 0 > /sys/class/leds/pwm0_led/brightness
 ```
 
 The device-tree status should report `okay`, and `/sys/class/leds` should
-contain `pwm0_led`. Because the LED consumer owns PWM0, do not export `pwm0`
-manually through `/sys/class/pwm`.
+contain `pwm0_led`. Run the device-only test script from the device shell:
+
+```sh
+/usr/bin/test-pwm-led.sh
+```
+
+The script continuously cycles the LED and turns it off when interrupted.
+Because the LED consumer owns PWM0, do not export `pwm0` manually through
+`/sys/class/pwm`.
 
 ## Temporarily loading the module on the device
 
@@ -225,9 +255,10 @@ adb shell
 Then repeat the device-shell commands above.
 
 This temporary test does not modify the firmware image. It verifies module
-compatibility with the running kernel, but it will not probe the camera yet
-because the running device tree still describes the SC3336 sensor. A successful
-module load may therefore produce no IMX415 sensor messages.
+compatibility with the running kernel. On firmware built from the current
+tracked DTSI, the IMX415 node is enabled and the module may probe the sensor;
+on an older stock image, it will only load the module because the device tree
+still describes the stock camera configuration.
 
 If loading fails, capture the complete error and recent kernel log. Common
 failures include an invalid module format, an ARM architecture mismatch,
@@ -285,6 +316,12 @@ The tracked root DTSI currently contains the staged camera migration:
 - The existing MIPI clock and camera power-down pin are reused.
 - Reset GPIO and regulator assignments remain TODOs until the module wiring is
   confirmed.
+- The ST7789 display node is commented out because its D/C signal used
+  GPIO1_PA2.
+- PWM0 uses GPIO1_PA2 and is exposed through a `pwm-leds` consumer named
+  `pwm0_led` with normal polarity.
+- The tracked kernel configuration enables both `CONFIG_VIDEO_IMX415=m` and
+  `CONFIG_LEDS_PWM=y`.
 
 The root-level build script is the required build entry point:
 
@@ -307,10 +344,10 @@ Flash it from the repository root with the local upgrade tool:
 
 ## Status
 
-The supplied board image currently contains SC3336 support and does not
-contain an installed `imx415.ko` module or IMX415 IQ file. The LuckFox SDK
-contains an IMX415 driver implementation and is the starting point for the
-kernel and device-tree integration work.
+The supplied stock board image currently contains SC3336 support and does not
+contain an installed `imx415.ko` module or IMX415 IQ file. The tracked changes
+build the IMX415 module and PWM LED support into the development image; IMX415
+IQ-file selection and final camera validation remain outstanding.
 
 See [camera.md](camera.md) and [implementation-plan.md](implementation-plan.md)
 for the detailed findings and plan.

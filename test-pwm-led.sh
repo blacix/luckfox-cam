@@ -17,21 +17,14 @@ run_test() {
     low=$((max / 4))
     mid=$((max / 2))
 
-    printf "off: %s\n" 0
-    echo 0 > "$led/brightness"
-    sleep 2
+    trap 'echo 0 > /sys/class/leds/pwm0_led/brightness' EXIT INT TERM
 
-    printf "low: %s\n" "$low"
-    echo "$low" > "$led/brightness"
-    sleep 2
-
-    printf "mid: %s\n" "$mid"
-    echo "$mid" > "$led/brightness"
-    sleep 2
-
-    printf "max: %s\n" "$max"
-    echo "$max" > "$led/brightness"
-    sleep 2
+    while true; do
+        for brightness in 0 "$low" "$mid" "$max" "$mid" "$low"; do
+            echo "$brightness" > "$led/brightness"
+            sleep 0.3
+        done
+    done
 }
 
 run_test
