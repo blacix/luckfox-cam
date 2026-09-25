@@ -182,9 +182,12 @@ script from the repository root:
 ```
 
 The script pushes `imx415.ko` to `/tmp/imx415.ko`, installs
-`test-pwm-led.sh` as `/usr/bin/test-pwm-led.sh`, and loads the IMX415 module
-with `insmod` if it is not already loaded. It requires a connected device
-with a root ADB shell.
+`test-pwm-led.sh` as `/usr/bin/test-pwm-led.sh`, installs the init script
+`S99a-eye` as `/etc/init.d/S99a-eye`, and stores `imx415.ko` in the persistent
+`/oem/usr/ko/` module directory. It then restarts `S99a-eye`, which loads the
+module with `insmod` if it is not already loaded and starts the LED test
+script. The `S99` prefix includes the script in the device's normal init-script
+sequence. Deployment requires a connected device with a root ADB shell.
 
 ## Testing PWM0 on the second LED
 
@@ -221,6 +224,14 @@ contain `pwm0_led`. Run the device-only test script from the device shell:
 The script continuously cycles the LED and turns it off when interrupted.
 Because the LED consumer owns PWM0, do not export `pwm0` manually through
 `/sys/class/pwm`.
+
+The init script can also be controlled manually from the device shell:
+
+```sh
+/etc/init.d/S99a-eye start
+/etc/init.d/S99a-eye stop
+/etc/init.d/S99a-eye restart
+```
 
 ## Temporarily loading the module on the device
 
