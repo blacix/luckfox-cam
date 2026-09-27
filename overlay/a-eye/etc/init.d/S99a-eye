@@ -2,7 +2,7 @@
 
 LED_TEST=/usr/bin/test-pwm-led.sh
 MODULE=/oem/usr/ko/imx415.ko
-PIDFILE=/var/run/a-eye-pwm-led.pid
+PIDFILE=/run/a-eye-pwm-led.pid
 
 is_running() {
 	[ -f "$PIDFILE" ] || return 1
@@ -30,13 +30,26 @@ start() {
 	fi
 
 	"$LED_TEST" >/dev/null 2>&1 &
-	echo "$!" > "$PIDFILE"
+	pid=$!
+	if ! printf '%s\n' "$pid" > "$PIDFILE"; then
+		kill -KILL "$pid" 2>/dev/null || true
+		echo "Could not create PID file: $PIDFILE" >&2
+		return 1
+	fi
 }
 
 stop() {
-	if is_running; then
-		kill "$(cat "$PIDFILE")" 2>/dev/null || true
+	if [ -f "$PIDFILE" ]; then
+		pid=$(cat "$PIDFILE")
+		if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+			kill -TERM "$pid" 2>/dev/null || true
+			sleep 1
+			if kill -0 "$pid" 2>/dev/null; then
+				kill -KILL "$pid" 2>/dev/null || true
+			fi
+		fi
 	fi
+	echo 0 > /sys/class/leds/pwm0_led/brightness 2>/dev/null || true
 	rm -f "$PIDFILE"
 }
 
