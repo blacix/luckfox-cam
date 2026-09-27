@@ -168,9 +168,16 @@ The stock Pico Mini BoardConfig already selects
 BoardConfig is required.
 
 The overlay packages the init script and LED test script into the generated
-root filesystem. The generated `imx415.ko` is still deployed separately by
-`deploy.sh` to `/oem/usr/ko/`; packaging that module into the image is a
-separate follow-up step.
+root filesystem. `CONFIG_VIDEO_IMX415=m` in the tracked kernel configuration
+causes the SDK to build `imx415.ko`. During a full image build, the SDK's
+driver-install step copies kernel modules into the OEM package under
+`/usr/ko`, which becomes `/oem/usr/ko/` on the device. Consequently,
+`imx415.ko` is included in the generated image when using
+`./build-camera.sh`.
+
+`deploy.sh` remains useful for testing a newly built module without rebuilding
+and flashing the complete image. It copies the module to the same persistent
+`/oem/usr/ko/` location and restarts the init script.
 
 The copied DTSI contains the board-specific hardware description: the IMX415
 I²C node and CSI-2 endpoint graph, the disabled legacy camera nodes, the PWM0
@@ -212,10 +219,12 @@ The script pushes `imx415.ko` to `/tmp/imx415.ko`, then uses the tracked
 `overlay/a-eye/etc/init.d/S99a-eye` files as the sources for the device-side
 installations `/usr/bin/test-pwm-led.sh` and `/etc/init.d/S99a-eye`. It stores
 `imx415.ko` in the persistent `/oem/usr/ko/` module directory. It then
-restarts `S99a-eye`, which loads the module with `insmod` if it is not already
-loaded and starts the LED test script. The `S99` prefix includes the script in
-the device's normal init-script sequence. Deployment requires a connected
-device with a root ADB shell.
+restarts `S99a-eye`, which starts the LED test script. The normal SDK startup
+sequence is expected to load `imx415.ko` from `/oem/usr/ko/` through
+`insmod_ko.sh`. `S99a-eye` also performs fallback loading with `insmod` if the
+module is not already loaded. The `S99` prefix includes the script in the
+device's normal init-script sequence. Deployment requires a connected device
+with a root ADB shell.
 
 ## Testing PWM0 on the second LED
 
