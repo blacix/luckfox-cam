@@ -143,7 +143,7 @@ After selecting the board, return to the repository root. Build the complete
 SDK image set and package a flashable `update.img`:
 
 ```sh
-./build-camera.sh
+./build.sh
 ```
 
 Before building, the script copies the tracked kernel files into these SDK
@@ -173,7 +173,7 @@ causes the SDK to build `imx415.ko`. During a full image build, the SDK's
 driver-install step copies kernel modules into the OEM package under
 `/usr/ko`, which becomes `/oem/usr/ko/` on the device. Consequently,
 `imx415.ko` is included in the generated image when using
-`./build-camera.sh`.
+`./build.sh`.
 
 `deploy.sh` remains useful for testing a newly built module without rebuilding
 and flashing the complete image. It copies the module to the same persistent
@@ -342,7 +342,7 @@ hardware properties.
 After editing the device tree, rebuild and package from the repository root:
 
 ```sh
-./build-camera.sh
+./build.sh
 ```
 
 The updated device tree must eventually be packaged into the boot image. The
@@ -375,7 +375,7 @@ staged camera migration:
 The root-level build script is the required build entry point:
 
 ```sh
-./build-camera.sh
+./build.sh
 ```
 
 After a successful build, the complete firmware image is available at:
