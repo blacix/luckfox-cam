@@ -2,7 +2,31 @@
 
   The work should proceed in stages, with a hardware and boot-recovery checkpoint before modifying the firmware.
 
-  ### 1. Establish a recoverable baseline
+  ### Current status
+
+  Completed:
+
+  - Stock recovery and upgrade workflow documented and tested.
+  - SDK board selection, kernel, device-tree, driver, and image-packaging flow audited.
+  - Reproducible root-level build workflow implemented.
+  - IMX415 kernel module enabled as `CONFIG_VIDEO_IMX415=m`.
+  - Full image builds include `imx415.ko` in `/oem/usr/ko/`.
+  - Normal SDK module loading and the `S99a-eye` fallback loading path documented.
+  - PWM0 LED device-tree consumer, test script, and init-script deployment implemented.
+
+  In progress:
+
+  - Finalize and validate the IMX415 camera device-tree configuration, especially
+    the sensor power and reset wiring.
+
+  Remaining after the device-tree configuration:
+
+  - Validate sensor probing and CSI-2/media topology.
+  - Select a conservative two-lane capture mode and verify frame acquisition.
+  - Add and validate IMX415 IQ/tuning data.
+  - Validate the complete application camera path.
+
+  ### 1. Establish a recoverable baseline — complete
 
   - Record the currently working firmware images in Luckfox_Pico_Mini_Flash_250607/.
   - Document the upgrade-tool command, USB/ADB connection procedure, and recovery method.
@@ -17,7 +41,7 @@
 
   Gate: The board can be restored to the supplied stock image before any camera changes.
 
-  ### 2. Verify the IMX415 hardware module
+  ### 2. Verify the IMX415 hardware module — substantially complete
 
   Before changing software, identify the exact camera module and confirm:
 
@@ -33,7 +57,7 @@
 
   Gate: The module’s electrical and MIPI configuration is compatible with the RV1103 board.
 
-  ### 3. Audit the SDK against the installed firmware
+  ### 3. Audit the SDK against the installed firmware — complete
 
   Use the SDK and supplied binaries to determine:
 
@@ -50,7 +74,7 @@
 
   Deliverable: A source-to-image map showing which SDK files produce each firmware component.
 
-  ### 4. Build an unchanged SDK baseline
+  ### 4. Build an unchanged SDK baseline — complete
 
   Build the SDK without camera modifications and verify that it produces a bootable image for the target board.
 
@@ -63,7 +87,7 @@
 
   Gate: A baseline SDK build boots successfully, or the differences between the SDK build and supplied stock firmware are understood.
 
-  ### 5. Integrate the IMX415 kernel driver
+  ### 5. Integrate the IMX415 kernel driver — complete
 
   Add or enable the SDK’s IMX415 driver:
 
@@ -75,7 +99,7 @@
 
   Initially, the goal should only be reliable sensor probing and V4L2 subdevice registration.
 
-  ### 6. Replace the camera device-tree configuration
+  ### 6. Replace the camera device-tree configuration — in progress
 
   Create the IMX415 camera configuration for the RV1103G target:
 
@@ -91,7 +115,7 @@
 
   Gate: Boot logs show a valid IMX415 sensor ID and no probe failure.
 
-  ### 7. Start with a conservative sensor mode
+  ### 7. Start with a conservative sensor mode — pending device-tree validation
 
   Do not begin with the native 3840×2160 mode.
 
@@ -111,7 +135,7 @@
 
   Only attempt higher resolutions after the reduced mode is stable.
 
-  ### 8. Handle IQ/tuning configuration separately
+  ### 8. Handle IQ/tuning configuration separately — pending
 
   The supplied image has no IMX415 IQ file, so image-quality tuning is a separate workstream.
 
@@ -125,7 +149,7 @@
 
   An existing SC3336 or unrelated sensor IQ file should not be treated as a final IMX415 configuration.
 
-  ### 9. Package and flash incrementally
+  ### 9. Package and flash incrementally — ongoing validation
 
   Build and flash the smallest necessary change first:
 
@@ -143,7 +167,7 @@
 
   The upgrade tool should be used only after identifying which image contains the changed component. Avoid reflashing unrelated partitions during early iterations.
 
-  ### 10. Validate the complete camera path
+  ### 10. Validate the complete camera path — pending
 
   Validation should cover four levels:
 
@@ -167,5 +191,4 @@
   The first practical milestone should be:
 
   > A rebuilt firmware image boots, the IMX415 reports its correct sensor ID, and a reduced two-lane mode produces frames through the RKCIF/V4L2 path.
-
 

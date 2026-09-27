@@ -393,10 +393,12 @@ Flash it from the repository root with the local upgrade tool:
 
 ## Status
 
-The supplied stock board image currently contains SC3336 support and does not
-contain an installed `imx415.ko` module or IMX415 IQ file. The tracked changes
-build the IMX415 module and PWM LED support into the development image; IMX415
-IQ-file selection and final camera validation remain outstanding.
+The reproducible build, kernel configuration, IMX415 module packaging and
+loading, PWM0 LED support, rootfs overlay, deployment script, and init-script
+workflow are complete. The remaining implementation work is the final IMX415
+camera device-tree configuration, including confirmation of the sensor reset
+and regulator wiring. After that, sensor probing, conservative two-lane frame
+capture, IMX415 IQ-file selection, and final application validation remain.
 
 See [camera.md](camera.md) and [implementation-plan.md](implementation-plan.md)
 for the detailed findings and plan.
