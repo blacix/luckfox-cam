@@ -4,8 +4,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 MODULE="${ROOT_DIR}/sdk/luckfox-pico/sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko"
-LED_TEST="${ROOT_DIR}/test-pwm-led.sh"
-INIT_SCRIPT="${ROOT_DIR}/S99a-eye"
+LED_TEST="${ROOT_DIR}/overlay/a-eye/usr/bin/test-pwm-led.sh"
+INIT_SCRIPT="${ROOT_DIR}/overlay/a-eye/etc/init.d/S99a-eye"
 REMOTE_MODULE=/tmp/imx415.ko
 REMOTE_SCRIPT=/tmp/test-pwm-led.sh
 REMOTE_INIT=/tmp/S99a-eye

@@ -28,6 +28,13 @@ mode.
 ├── README.md
 ├── camera.md
 ├── implementation-plan.md
+├── kernel/                       # Tracked kernel inputs
+│   ├── rv1103-luckfox-pico-ipc.dtsi
+│   └── luckfox_rv1106_linux_defconfig
+├── overlay/                     # Tracked rootfs overlay inputs
+│   └── a-eye/
+│       ├── etc/init.d/S99a-eye
+│       └── usr/bin/test-pwm-led.sh
 └── sdk/                         # Local SDK and firmware tools; ignored by Git
     ├── Luckfox_Pico_Mini_Flash_250607/
     │   └── Stock firmware images and update files
@@ -103,19 +110,19 @@ The stock SC3336 IQ file must not be treated as an IMX415 configuration.
 The local LuckFox SDK already contains the IMX415 driver and enables it as a
 loadable kernel module with `CONFIG_VIDEO_IMX415=m`.
 
-The tracked root-level DTSI is the source of truth for local camera changes:
+The tracked DTSI is the source of truth for local camera changes:
 
 ```text
-rv1103-luckfox-pico-ipc.dtsi
+kernel/rv1103-luckfox-pico-ipc.dtsi
 ```
 
 The tracked kernel configuration is:
 
 ```text
-luckfox_rv1106_linux_defconfig
+kernel/luckfox_rv1106_linux_defconfig
 ```
 
-Select the LuckFox Pico Mini configuration once using the SDK menu:
+Select the SPI-NAND LuckFox Pico Mini baseline once using the SDK menu:
 
 ```sh
 ./sdk/luckfox-pico/build.sh lunch
@@ -129,6 +136,9 @@ SPI_NAND
 Buildroot
 ```
 
+The SDK stores this selection in `.BoardConfig.mk`. You do not need to select
+the board again for every build.
+
 After selecting the board, return to the repository root. Build the complete
 SDK image set and package a flashable `update.img`:
 
@@ -136,15 +146,31 @@ SDK image set and package a flashable `update.img`:
 ./build-camera.sh
 ```
 
-Before building, the script copies the tracked files into these SDK
+Before building, the script copies the tracked kernel files into these SDK
 destinations:
 
 ```text
-rv1103-luckfox-pico-ipc.dtsi
+kernel/rv1103-luckfox-pico-ipc.dtsi
   -> sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi
-luckfox_rv1106_linux_defconfig
+kernel/luckfox_rv1106_linux_defconfig
   -> sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/configs/luckfox_rv1106_linux_defconfig
 ```
+
+Finally, it copies `overlay/a-eye/` into the already-selected SDK overlay:
+
+```text
+overlay/a-eye/
+  -> sdk/luckfox-pico/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/
+```
+
+The stock Pico Mini BoardConfig already selects
+`overlay-luckfox-buildroot-init` through `RK_POST_OVERLAY`, so no custom
+BoardConfig is required.
+
+The overlay packages the init script and LED test script into the generated
+root filesystem. The generated `imx415.ko` is still deployed separately by
+`deploy.sh` to `/oem/usr/ko/`; packaging that module into the image is a
+separate follow-up step.
 
 The copied DTSI contains the board-specific hardware description: the IMX415
 I²C node and CSI-2 endpoint graph, the disabled legacy camera nodes, the PWM0
@@ -181,13 +207,15 @@ script from the repository root:
 ./deploy.sh
 ```
 
-The script pushes `imx415.ko` to `/tmp/imx415.ko`, installs
-`test-pwm-led.sh` as `/usr/bin/test-pwm-led.sh`, installs the init script
-`S99a-eye` as `/etc/init.d/S99a-eye`, and stores `imx415.ko` in the persistent
-`/oem/usr/ko/` module directory. It then restarts `S99a-eye`, which loads the
-module with `insmod` if it is not already loaded and starts the LED test
-script. The `S99` prefix includes the script in the device's normal init-script
-sequence. Deployment requires a connected device with a root ADB shell.
+The script pushes `imx415.ko` to `/tmp/imx415.ko`, then uses the tracked
+`overlay/a-eye/usr/bin/test-pwm-led.sh` and
+`overlay/a-eye/etc/init.d/S99a-eye` files as the sources for the device-side
+installations `/usr/bin/test-pwm-led.sh` and `/etc/init.d/S99a-eye`. It stores
+`imx415.ko` in the persistent `/oem/usr/ko/` module directory. It then
+restarts `S99a-eye`, which loads the module with `insmod` if it is not already
+loaded and starts the LED test script. The `S99` prefix includes the script in
+the device's normal init-script sequence. Deployment requires a connected
+device with a root ADB shell.
 
 ## Testing PWM0 on the second LED
 
@@ -277,7 +305,7 @@ missing symbols, or insufficient permissions.
 
 ## Starting device-tree integration
 
-The tracked root-level DTSI is the file to edit. Before copying it over the
+The tracked `kernel/` DTSI is the file to edit. Before copying it over the
 SDK version, create a backup of the stock SDK DTSI:
 
 ```sh
@@ -291,7 +319,7 @@ Inspect them from the repository root:
 
 ```sh
 grep -n -E "sc3336|sc4336|sc530ai|mipi|csi2|endpoint|ff470000" \
-  rv1103-luckfox-pico-ipc.dtsi
+  kernel/rv1103-luckfox-pico-ipc.dtsi
 ```
 
 Replace the SC3336 sensor node with an IMX415 sensor node in the included
@@ -319,7 +347,8 @@ device tree, and recovery image have been checked together.
 
 ## Current device-tree integration
 
-The tracked root DTSI currently contains the staged camera migration:
+The tracked `kernel/rv1103-luckfox-pico-ipc.dtsi` currently contains the
+staged camera migration:
 
 - SC3336, SC4336, and SC530AI nodes are disabled.
 - The CSI-2 input endpoint points to `imx415_out`.
