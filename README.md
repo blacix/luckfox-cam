@@ -105,97 +105,84 @@ Work should proceed in this order:
 
 The stock SC3336 IQ file must not be treated as an IMX415 configuration.
 
-## Building the IMX415 kernel module
+## Tracked project files and SDK synchronization
 
-The local LuckFox SDK already contains the IMX415 driver and enables it as a
-loadable kernel module with `CONFIG_VIDEO_IMX415=m`.
-
-The tracked DTSI is the source of truth for local camera changes:
-
-```text
-kernel/rv1103-luckfox-pico-ipc.dtsi
-```
-
-The tracked kernel configuration is:
-
-```text
-kernel/luckfox_rv1106_linux_defconfig
-```
-
-Select the SPI-NAND LuckFox Pico Mini baseline once using the SDK menu:
+The project takes the kernel inputs from the SDK and maintains the modified
+versions as tracked files under `kernel/`; rootfs additions are tracked under
+`overlay/`. Keep project changes in those tracked copies. The SDK directory is
+ignored by this repository. Before the first build replaces SDK files with
+project files, save the original SDK DTSI and defconfig as `.orig`. Run this
+once from the repository root:
 
 ```sh
-./sdk/luckfox-pico/build.sh lunch
+cp sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi \
+  sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi.orig
+cp sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/configs/luckfox_rv1106_linux_defconfig \
+  sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/configs/luckfox_rv1106_linux_defconfig.orig
 ```
 
-Select these options from the menus:
+The tracked inputs and the SDK paths they replace are:
 
-```text
-RV1103_Luckfox_Pico_Mini
-SPI_NAND
-Buildroot
-```
+| Tracked project file | SDK destination |
+| --- | --- |
+| `kernel/rv1103-luckfox-pico-ipc.dtsi` | `sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi` |
+| `kernel/luckfox_rv1106_linux_defconfig` | `sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/configs/luckfox_rv1106_linux_defconfig` |
+| `overlay/a-eye/` | `sdk/luckfox-pico/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/` |
 
-The SDK stores this selection in `.BoardConfig.mk`. You do not need to select
-the board again for every build.
+Make changes in the tracked project copies under `kernel/` and `overlay/`.
+The root `build.sh` copies them into the SDK before building. The stock Pico
+Mini BoardConfig already selects the init overlay, so no custom BoardConfig is
+needed. The DTSI contains the IMX415 node and CSI-2 graph plus PWM0 LED setup;
+the defconfig enables `CONFIG_VIDEO_IMX415=m` and `CONFIG_LEDS_PWM=y`.
 
-After selecting the board, return to the repository root. Build the complete
-SDK image set and package a flashable `update.img`:
+## Building, flashing, and testing the image
 
-```sh
-./build.sh
-```
+The root build script builds and packages the complete firmware image; it is
+not a driver-only build. The tracked DTSI configures PWM0 as the LED consumer,
+and the tracked kernel defconfig enables both PWM LED support and the IMX415
+driver. Follow this sequence to put those changes on the board:
 
-Before building, the script copies the tracked kernel files into these SDK
-destinations:
+1. Configure the camera and PWM LED in the tracked DTSI and enable
+   `CONFIG_VIDEO_IMX415=m` and `CONFIG_LEDS_PWM=y` in the tracked defconfig.
+2. Select the SPI-NAND LuckFox Pico Mini target only once for this SDK setup:
 
-```text
-kernel/rv1103-luckfox-pico-ipc.dtsi
-  -> sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi
-kernel/luckfox_rv1106_linux_defconfig
-  -> sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/configs/luckfox_rv1106_linux_defconfig
-```
+   ```sh
+   ./sdk/luckfox-pico/build.sh lunch
+   ```
 
-Finally, it copies `overlay/a-eye/` into the already-selected SDK overlay:
+   Choose `RV1103_Luckfox_Pico_Mini`, `[1] SPI_NAND`, and `Buildroot`.
+3. Build the full image from the repository root. This copies the tracked
+   project files into the SDK, builds all components, and packages
+   `update.img`:
 
-```text
-overlay/a-eye/
-  -> sdk/luckfox-pico/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/
-```
+   ```sh
+   ./build.sh
+   ```
+4. Flash the generated image to the board:
 
-The stock Pico Mini BoardConfig already selects
-`overlay-luckfox-buildroot-init` through `RK_POST_OVERLAY`, so no custom
-BoardConfig is required.
+   ```sh
+   ./sdk/upgrade_tool_v2_17/upgrade_tool uf \
+     ./sdk/luckfox-pico/output/image/update.img
+   ```
+5. After the board boots, test the PWM LED using the section below. Validate
+   IMX415 probing, media topology, and frame capture using the steps in
+   [implementation-plan.md](implementation-plan.md).
 
-The overlay packages the init script and LED test script into the generated
-root filesystem. `CONFIG_VIDEO_IMX415=m` in the tracked kernel configuration
-causes the SDK to build `imx415.ko`. During a full image build, the SDK's
-driver-install step copies kernel modules into the OEM package under
-`/usr/ko`, which becomes `/oem/usr/ko/` on the device. Consequently,
-`imx415.ko` is included in the generated image when using
-`./build.sh`.
+The SDK stores the selected target in `.BoardConfig.mk`; do not run `lunch`
+again for subsequent builds. The image includes `imx415.ko` under
+`/oem/usr/ko/`, and the SDK startup sequence loads it during boot. After
+flashing, verify it is loaded with `lsmod | grep imx415`.
 
 `deploy.sh` remains useful for testing a newly built module without rebuilding
 and flashing the complete image. It copies the module to the same persistent
 `/oem/usr/ko/` location and restarts the init script.
-
-The copied DTSI contains the board-specific hardware description: the IMX415
-I²C node and CSI-2 endpoint graph, the disabled legacy camera nodes, the PWM0
-pin assignment, the `pwm-leds` consumer for GPIO1_PA2, and the commented-out
-ST7789 node that previously used the same pin. The copied defconfig controls
-which kernel features are built; in particular, it enables the IMX415 driver
-as a module with `CONFIG_VIDEO_IMX415=m` and builds the PWM LED consumer with
-`CONFIG_LEDS_PWM=y`.
-
-It then runs `sdk/luckfox-pico/build.sh all` and packages the result with
-`updateimg`.
 
 After the build, locate the generated module and verify the kernel
 configuration:
 
 ```sh
 ls -l sdk/luckfox-pico/sysdrv/source/objs_kernel/drv_ko/lib/modules/5.10.160/kernel/drivers/media/i2c/imx415.ko
-grep -n "CONFIG_VIDEO_IMX415" sdk/luckfox-pico/sysdrv/source/objs_kernel/.config
+grep -n "CONFIG_VIDEO_IMX415\|CONFIG_LEDS_PWM" sdk/luckfox-pico/sysdrv/source/objs_kernel/.config
 ```
 
 The expected configuration is:
@@ -207,8 +194,8 @@ CONFIG_LEDS_PWM=y
 
 ## Deploying the driver and LED test script
 
-After building the kernel module, deploy it and the device-only LED test
-script from the repository root:
+For module-only iteration after building, deploy the module and device-only LED
+test script from the repository root:
 
 ```sh
 ./deploy.sh
@@ -270,7 +257,12 @@ The init script can also be controlled manually from the device shell:
 /etc/init.d/S99a-eye restart
 ```
 
-## Temporarily loading the module on the device
+## Optional: manually loading the module on the device
+
+Manual upload and loading are optional. Use this method to test the module
+without rebuilding and flashing the full image, or to load it on a running
+device where it was not loaded at boot. The normal image build packages the
+module in `/oem/usr/ko/` for startup loading.
 
 From the host shell, copy the module to a temporary directory on the
 board, then open an interactive shell on the device:
@@ -312,19 +304,12 @@ If loading fails, capture the complete error and recent kernel log. Common
 failures include an invalid module format, an ARM architecture mismatch,
 missing symbols, or insufficient permissions.
 
-## Starting device-tree integration
+## Editing the device tree
 
-The tracked `kernel/` DTSI is the file to edit. Before copying it over the
-SDK version, create a backup of the stock SDK DTSI:
-
-```sh
-cp sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi \
-  sdk/luckfox-pico/sysdrv/source/kernel/arch/arm/boot/dts/rv1103-luckfox-pico-ipc.dtsi.orig
-```
-
-The build script copies this file to the SDK path selected by the board DTS.
-The SC3336 sensor nodes and CSI endpoint connections are defined in it.
-Inspect them from the repository root:
+Edit the tracked DTSI described in
+[Tracked project files and SDK synchronization](#tracked-project-files-and-sdk-synchronization).
+The SC3336 sensor nodes and CSI endpoint connections are defined in it. Inspect
+them from the repository root:
 
 ```sh
 grep -n -E "sc3336|sc4336|sc530ai|mipi|csi2|endpoint|ff470000" \
